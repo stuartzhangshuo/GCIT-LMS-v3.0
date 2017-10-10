@@ -7,42 +7,56 @@ package com.gcit.libmgmtsys.dao;
 import java.sql.*;
 import java.util.*;
 
-import com.gcit.libmgmtsys.entity.Author;
-import com.gcit.libmgmtsys.entity.Book;
+import org.springframework.jdbc.core.PreparedStatementCreator;
+import org.springframework.jdbc.core.ResultSetExtractor;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+
 import com.gcit.libmgmtsys.entity.BookLoans;
-import com.gcit.libmgmtsys.entity.Borrower;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
-public class BookLoansDAO extends BaseDAO{
-
-	public BookLoansDAO(Connection conn) {
-		super(conn);
-	}
-	
+@SuppressWarnings("rawtypes")
+public class BookLoansDAO extends BaseDAO implements ResultSetExtractor<List<BookLoans>>{
 	//insert a new book loan
 	public void addBookLoans(BookLoans bookLoan) throws SQLException {
-		executeUpdate("INSERT INTO tbl_book_loans (bookId, branchId, cardNo, dateOut, dueDate) "
+		template.update("INSERT INTO tbl_book_loans (bookId, branchId, cardNo, dateOut, dueDate) "
 				+ "VALUES(?, ?, ?, NOW(), NOW() + INTERVAL 7 DAY)",
 				new Object[] {bookLoan.getBook().getBookId(), bookLoan.getLibraryBranch().getBranchId(), bookLoan.getBorrower().getCardNo()});
 	}
 	
 	//insert a new book loan and return the generated ID
-	public Integer addBookLoansWithID(BookLoans bookLoan) throws SQLException {
-		return executeUpdateWithID("INSERT INTO tbl_book_loans (bookId, branchId, cardNo, dateOut, dueDate) "
-				+ "VALUES(?, ?, ?, NOW(), NOW() + INTERVAL 7 DAY)",
-				new Object[] {bookLoan.getBook().getBookId(), bookLoan.getLibraryBranch().getBranchId(), bookLoan.getBorrower().getCardNo()});
+	public Integer addBookLoansWithID(BookLoans bookLoan) throws SQLException{
+		KeyHolder holder = new GeneratedKeyHolder();
+		final String sql = "INSERT INTO tbl_book_loans (bookId, branchId, cardNo, dateOut, dueDate) "
+				+ "VALUES(?, ?, ?, NOW(), NOW() + INTERVAL 7 DAY)";
+		template.update(new PreparedStatementCreator() {
+			@Override
+			public PreparedStatement createPreparedStatement(Connection connection) throws SQLException {
+				PreparedStatement ps = connection.prepareStatement(sql.toString(), Statement.RETURN_GENERATED_KEYS);
+				ps.setInt(1, bookLoan.getBook().getBookId());
+				ps.setInt(2, bookLoan.getLibraryBranch().getBranchId());
+				ps.setInt(3, bookLoan.getBorrower().getCardNo());
+				return ps;
+			}
+		}, holder);
+		return holder.getKey().intValue();
 	}
+	
+//	public Integer addBookLoansWithID(BookLoans bookLoan) throws SQLException {
+//		return executeUpdateWithID("INSERT INTO tbl_book_loans (bookId, branchId, cardNo, dateOut, dueDate) "
+//				+ "VALUES(?, ?, ?, NOW(), NOW() + INTERVAL 7 DAY)",
+//				new Object[] {bookLoan.getBook().getBookId(), bookLoan.getLibraryBranch().getBranchId(), bookLoan.getBorrower().getCardNo()});
+//	}
 	
 	//update the check-in
 	public void updateBookLoanCheckIn(BookLoans bookLoan) throws SQLException {
-		executeUpdate("UPDATE tbl_book_loans SET dateIn = NOW() "
+		template.update("UPDATE tbl_book_loans SET dateIn = NOW() "
 				+ "WHERE bookId = ? AND branchId = ? AND cardNo = ? AND dateOut = ?", 
 				new Object[] {bookLoan.getBook().getBookId(), bookLoan.getLibraryBranch().getBranchId(), bookLoan.getBorrower().getCardNo(), bookLoan.getDateOut()});
 	}
 	
 	//Override the due date of a book loan for 7 days.
 	public void updateBookLoanOverride(BookLoans bookLoan) throws SQLException {
-		executeUpdate("UPDATE tbl_book_loans SET dueDate = DATE_ADD(dueDate, INTERVAL 7 DAY) "
+		template.update("UPDATE tbl_book_loans SET dueDate = DATE_ADD(dueDate, INTERVAL 7 DAY) "
 				+ "WHERE bookId = ? AND branchId = ? AND cardNo = ? AND dateOut = ?", 
 				new Object[] {bookLoan.getBook().getBookId(), bookLoan.getLibraryBranch().getBranchId(), bookLoan.getBorrower().getCardNo(), bookLoan.getDateOut()});
 	}
@@ -51,10 +65,10 @@ public class BookLoansDAO extends BaseDAO{
 		setPageNo(pageNo);
 		if (cardNo != null && !cardNo.isEmpty()) {
 			Integer borrowerId = Integer.parseInt(cardNo);
-			return executeQuery("SELECT * FROM tbl_book_loans WHERE cardNo = ?",
-					new Object[] {borrowerId});
+			return template.query("SELECT * FROM tbl_book_loans WHERE cardNo = ?",
+					new Object[] {borrowerId}, this);
 		} else {
-			return executeQuery("SELECT * FROM tbl_book_loans", null);
+			return template.query("SELECT * FROM tbl_book_loans", this);
 		}
 		
 //		if (cardNo != null && !cardNo.isEmpty() && branchId != null && !branchId.isEmpty()) {
@@ -82,53 +96,54 @@ public class BookLoansDAO extends BaseDAO{
 //	}
 	public List<BookLoans> readBookLoansByCardNoAndBranchId(Integer cardNo, Integer branchId) throws SQLException {
 		String sql = "SELECT * FROM tbl_book_loans WHERE cardNo = ? AND branchId = ? AND dateIn IS NULL";
-		return executeQuery(sql, new Object[] {cardNo, branchId});
+		return template.query(sql, new Object[] {cardNo, branchId}, this);
 	}
 	
 	
 	//TO-DO: delete a book loan
 	
 	
-	@Override
-	protected List<BookLoans> parseFirstLevelData(ResultSet rs) throws SQLException {
-//		String sql_book 	= "SELECT FROM tbl_book WHERE bookId = ?";
-//		String sql_branch   = "SELECT FROM tbl_library_branch WHERE branchId = ?";
-//		String sql_borrower = "SELECT FROM tbl_borrower WHERE cardNo = ?";
-		
-		BookDAO bookDao = new BookDAO(conn);
-		BorrowerDAO borrowerDao = new BorrowerDAO(conn);
-		LibraryBranchDAO libraryBranchDao = new LibraryBranchDAO(conn);
-		
-		List<BookLoans> bookLoans = new ArrayList<>();
-		while (rs.next()) {
-			BookLoans bookLoan = new BookLoans();
-			bookLoan.setBook(bookDao.readOneBookFirstLevel(rs.getInt("bookId")));
-			bookLoan.setBorrower(borrowerDao.readOneBorrowerFirstLevel(rs.getInt("cardNo")));
-			bookLoan.setLibraryBranch(libraryBranchDao.readOneLibrayBranchFirstLevel(rs.getInt("branchId")));
-			bookLoan.setDateOut(rs.getString("dateOut"));
-			bookLoan.setDueDate(rs.getString("dueDate"));
-			bookLoan.setDateIn(rs.getString("dateIn"));
-			bookLoans.add(bookLoan);
-		}
-		return bookLoans;
-	}
+//	@Override
+//	protected List<BookLoans> parseFirstLevelData(ResultSet rs) throws SQLException {
+////		String sql_book 	= "SELECT FROM tbl_book WHERE bookId = ?";
+////		String sql_branch   = "SELECT FROM tbl_library_branch WHERE branchId = ?";
+////		String sql_borrower = "SELECT FROM tbl_borrower WHERE cardNo = ?";
+//		
+//		BookDAO bookDao = new BookDAO(conn);
+//		BorrowerDAO borrowerDao = new BorrowerDAO(conn);
+//		LibraryBranchDAO libraryBranchDao = new LibraryBranchDAO(conn);
+//		
+//		List<BookLoans> bookLoans = new ArrayList<>();
+//		while (rs.next()) {
+//			BookLoans bookLoan = new BookLoans();
+//			bookLoan.setBook(bookDao.readOneBookFirstLevel(rs.getInt("bookId")));
+//			bookLoan.setBorrower(borrowerDao.readOneBorrowerFirstLevel(rs.getInt("cardNo")));
+//			bookLoan.setLibraryBranch(libraryBranchDao.readOneLibrayBranchFirstLevel(rs.getInt("branchId")));
+//			bookLoan.setDateOut(rs.getString("dateOut"));
+//			bookLoan.setDueDate(rs.getString("dueDate"));
+//			bookLoan.setDateIn(rs.getString("dateIn"));
+//			bookLoans.add(bookLoan);
+//		}
+//		return bookLoans;
+//	}
 
 	@Override
-	protected List<BookLoans> parseData(ResultSet rs) throws SQLException {
+	public List<BookLoans> extractData(ResultSet rs) throws SQLException {
 //		String sql_book 	= "SELECT FROM tbl_book WHERE bookId = ?";
 //		String sql_branch   = "SELECT FROM tbl_library_branch WHERE branchId = ?";
 //		String sql_borrower = "SELECT FROM tbl_borrower WHERE cardNo = ?";
 		
-		BookDAO bookDao = new BookDAO(conn);
-		BorrowerDAO borrowerDao = new BorrowerDAO(conn);
-		LibraryBranchDAO libraryBranchDao = new LibraryBranchDAO(conn);
+//		BookDAO bookDao = new BookDAO(conn);
+//		BorrowerDAO borrowerDao = new BorrowerDAO(conn);
+//		LibraryBranchDAO libraryBranchDao = new LibraryBranchDAO(conn);
 		
 		List<BookLoans> bookLoans = new ArrayList<>();
 		while (rs.next()) {
 			BookLoans bookLoan = new BookLoans();
-			bookLoan.setBook(bookDao.readOneBookFirstLevel(rs.getInt("bookId")));
-			bookLoan.setBorrower(borrowerDao.readOneBorrowerFirstLevel(rs.getInt("cardNo")));
-			bookLoan.setLibraryBranch(libraryBranchDao.readOneLibrayBranchFirstLevel(rs.getInt("branchId")));
+//			bookLoan.setBook(bookDao.readOneBookFirstLevel(rs.getInt("bookId")));
+//			bookLoan.setBorrower(borrowerDao.readOneBorrowerFirstLevel(rs.getInt("cardNo")));
+//			bookLoan.setLibraryBranch(libraryBranchDao.readOneLibrayBranchFirstLevel(rs.getInt("branchId")));
+			
 			bookLoan.setDateOut(rs.getString("dateOut"));
 			bookLoan.setDueDate(rs.getString("dueDate"));
 			bookLoan.setDateIn(rs.getString("dateIn"));
@@ -138,19 +153,19 @@ public class BookLoansDAO extends BaseDAO{
 	}
 
 	public Integer getBookLoansCount() throws SQLException {
-		return getCount("SELECT COUNT(*) as COUNT FROM tbl_book_loans", null);
+		return template.queryForObject("SELECT COUNT(*) as COUNT FROM tbl_book_loans", Integer.class);
 	}
 
 	public void deleteBookLoan(BookLoans bookLoan) throws SQLException {
-		executeUpdate("DELETE FROM tbl_book_loans WHERE bookId = ? AND branchId = ? AND cardNo = ? AND dateOut = ?",
+		template.update("DELETE FROM tbl_book_loans WHERE bookId = ? AND branchId = ? AND cardNo = ? AND dateOut = ?",
 				new Object[] {bookLoan.getBook().getBookId(), bookLoan.getLibraryBranch().getBranchId(),
 							  bookLoan.getBorrower().getCardNo(), bookLoan.getDateOut()});
 	}
 
 	public BookLoans readOneBookLoan(BookLoans bookLoan) throws SQLException {
-		List<BookLoans> bookLoans = executeQuery("SELECT * FROM tbl_book_loans WHERE bookId = ? AND branchId = ? AND cardNo = ? AND dateOut = ?", 
+		List<BookLoans> bookLoans = template.query("SELECT * FROM tbl_book_loans WHERE bookId = ? AND branchId = ? AND cardNo = ? AND dateOut = ?", 
 				new Object[] {bookLoan.getBook().getBookId(), bookLoan.getLibraryBranch().getBranchId(),
-						  bookLoan.getBorrower().getCardNo(), bookLoan.getDateOut()});
+						  bookLoan.getBorrower().getCardNo(), bookLoan.getDateOut()}, this);
 		if (bookLoans != null) {
 			return bookLoans.get(0);
 		}
@@ -158,7 +173,7 @@ public class BookLoansDAO extends BaseDAO{
 	}
 
 	public void updateBookLoan(BookLoans bookLoan) throws SQLException {
-		executeUpdate("UPDATE tbl_book_loans SET dueDate = DATE_ADD(dueDate, INTERVAL 7 DAY) WHERE bookId = ? AND branchId = ? AND cardNo = ? AND dateOut = ?",
+		template.update("UPDATE tbl_book_loans SET dueDate = DATE_ADD(dueDate, INTERVAL 7 DAY) WHERE bookId = ? AND branchId = ? AND cardNo = ? AND dateOut = ?",
 				new Object[] {bookLoan.getBook().getBookId(), bookLoan.getLibraryBranch().getBranchId(),
 							  bookLoan.getBorrower().getCardNo(), bookLoan.getDateOut()});
 	}
