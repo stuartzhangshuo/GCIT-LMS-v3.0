@@ -38,8 +38,48 @@ public class LMSConfig {
 	}
 	
 	@Bean
+	public BookAuthorDAO bookAuthorDao() {
+		return new BookAuthorDAO();
+	}
+	
+	@Bean
+	public BookCopiesDAO bookCopiesDao() {
+		return new BookCopiesDAO();
+	}
+	
+	@Bean
 	public BookDAO bookDao() {
 		return new BookDAO();
+	}
+	
+	@Bean
+	public BookGenreDAO bookGenreDao() {
+		return new BookGenreDAO();
+	}
+	
+	@Bean
+	public BookLoansDAO bookLoansDao() {
+		return new BookLoansDAO();
+	}
+	
+	@Bean
+	public BorrowerDAO borrowerDao() {
+		return new BorrowerDAO();
+	}
+	
+	@Bean
+	public GenreDAO genreDao() {
+		return new GenreDAO();
+	}
+	
+	@Bean
+	public LibraryBranchDAO libraryBranchDao() {
+		return new LibraryBranchDAO();
+	}
+	
+	@Bean
+	public PublisherDAO publisherDao() {
+		return new PublisherDAO();
 	}
 	
 	@Bean
