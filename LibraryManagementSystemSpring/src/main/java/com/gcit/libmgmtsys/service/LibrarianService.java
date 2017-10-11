@@ -7,234 +7,86 @@ package com.gcit.libmgmtsys.service;
 import java.sql.*;
 import java.util.*;
 
-import com.gcit.libmgmtsys.dao.AuthorDAO;
-import com.gcit.libmgmtsys.dao.BookCopiesDAO;
-import com.gcit.libmgmtsys.dao.BookDAO;
-import com.gcit.libmgmtsys.dao.LibraryBranchDAO;
-import com.gcit.libmgmtsys.entity.Author;
-import com.gcit.libmgmtsys.entity.Book;
-import com.gcit.libmgmtsys.entity.BookCopies;
-import com.gcit.libmgmtsys.entity.LibraryBranch;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.gcit.libmgmtsys.dao.*;
+import com.gcit.libmgmtsys.entity.*;
 
 public class LibrarianService {
-	private Utilities util = new Utilities();
+	// =================================================================================================================
+	// SPRING DAOs
+	// =================================================================================================================
 	
+	@Autowired
+	LibraryBranchDAO libraryBranchDao;
+
+	@Autowired
+	BookDAO bookDao;
+
+	@Autowired
+	BookCopiesDAO bookCopiesDao;
+	
+	
+	// =================================================================================================================
+	// TRANSACTIONS
+	// =================================================================================================================
+	
+	@Transactional
+	//update one library branch's information
 	public void updateBranchInfo(LibraryBranch libraryBranch) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			LibraryBranchDAO libraryBranchDao = new LibraryBranchDAO(conn);
-			libraryBranchDao.updateLibraryBranch(libraryBranch);
-			conn.commit();
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-			conn.rollback();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
+		libraryBranchDao.updateLibraryBranch(libraryBranch);
 	}
 	
-	public Book readOneBook(Integer bookId) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			BookDAO bookDao = new BookDAO(conn);
-			return bookDao.readOneBook(bookId);
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
-		return null;
+	@Transactional
+	//insert a book copy record into database
+	public void insertBookCopies(BookCopies bookCopies) throws SQLException {
+		bookCopiesDao.addBookCopies(bookCopies);
 	}
 	
-	public boolean checkBranchName(String branchName) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			LibraryBranchDAO libraryBranchDao = new LibraryBranchDAO(conn);
-			List<LibraryBranch> branchWithSameName = libraryBranchDao.checkBranchByName(branchName);
-			return branchWithSameName != null;
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
-		return Boolean.FALSE;
-	}
-	
+	@Transactional
+	//update an existing book copy's record
 	public void updateBookCopies(BookCopies bookCopies) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			BookCopiesDAO bookCopiesDao = new BookCopiesDAO(conn);
-			bookCopiesDao.updateBookCopies(bookCopies);
-			conn.commit();
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-			conn.rollback();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
+		bookCopiesDao.updateBookCopies(bookCopies);
 	}
 	
-	//return true when there is a record.
-	public Boolean checkBookCopies(BookCopies bookCopy) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			BookCopiesDAO bookCopiesDao = new BookCopiesDAO(conn);
-			List<BookCopies> bookCopies = bookCopiesDao.checkBookCopies(bookCopy);
-			if (bookCopies == null || bookCopies.size() == 0) {
-				return false;
-			}
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
+
+	// =================================================================================================================
+	// EXTRACTIONS
+	// =================================================================================================================
+	
+	//read one book information given book id
+	public Book readOneBook(Integer bookId) throws SQLException {
+		return bookDao.readOneBook(bookId);
+	}
+
+	//read all books by page number
+	public List<Book> readBooks(String searchString, Integer pageNo) throws SQLException {
+		return bookDao.readBooks(searchString, pageNo);
+	}
+	
+	//read one library branch information given branch id
+	public LibraryBranch readOneBranch(Integer branchId) throws SQLException {
+		return libraryBranchDao.readOneBranch(branchId);
+	}
+	
+	//read all library branches by page number
+	public List<LibraryBranch> readLibraryBranches(String searchString, Integer pageNo) throws SQLException {
+		return libraryBranchDao.readLibraryBranches(searchString, pageNo);
+	}
+	
+	//check if a branch name already exists in the database
+	public Boolean checkBranchName(String branchName) throws SQLException {
+		return libraryBranchDao.checkBranchByName(branchName) != null;
+	}
+
+	//check if a book copy pair (bookId, branchId) exist in the databse
+	public Boolean checkBookCopy(BookCopies bookCopy) throws SQLException {
+		List<BookCopies> bookCopies = bookCopiesDao.checkBookCopies(bookCopy);
+		if (bookCopies == null || bookCopies.size() == 0) {
+			return Boolean.FALSE;
 		}
 		return Boolean.TRUE;
-	}
-	
-	public void insertBookCopies(BookCopies bookCopies) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			BookCopiesDAO bookCopiesDao = new BookCopiesDAO(conn);
-			bookCopiesDao.addBookCopies(bookCopies);
-			conn.commit();
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-			conn.rollback();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
-	}
-	
-	public List<LibraryBranch> readLibraryBranches(String searchString, Integer pageNo) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			LibraryBranchDAO libraryBranchrDao = new LibraryBranchDAO(conn);
-			return libraryBranchrDao.readLibraryBranches(searchString, pageNo);
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
-		return null;
-	}
-	
-//	public List<LibraryBranch> readAllBranches() throws SQLException {
-//		Connection conn = null;
-//		try {
-//			conn = util.getConnection();
-//			LibraryBranchDAO libraryBranchDao = new LibraryBranchDAO(conn);
-//			return libraryBranchDao.readLibraryBranches(null);
-//		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-//			e.printStackTrace();
-//			conn.rollback();
-//		} finally {
-//			if (conn != null) {
-//				conn.close();
-//			}
-//		}
-//		return null;
-//	}
-	
-	public List<Book> readBooks(String searchString, Integer pageNo) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			BookDAO bookDao = new BookDAO(conn);
-			return bookDao.readBooks(searchString, pageNo);
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
-		return null;
-	}
-	
-	public LibraryBranch readOneBranch(Integer branchId) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			LibraryBranchDAO branchDao = new LibraryBranchDAO(conn);
-			return branchDao.readOneBranch(branchId);
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
-		return null;
-	}
-	
-	public LibraryBranch getBranchWithId(Integer branchId) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			LibraryBranchDAO libraryBranchDao = new LibraryBranchDAO(conn);
-			return libraryBranchDao.readOneBranch(branchId);
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
-		return null;
-	}
-	
-//	public List<Book> readBooksAvailable(String branchId) throws SQLException {
-//		Connection conn = null;
-//		try {
-//			conn = util.getConnection();
-//			BookDAO bookDao = new BookDAO(conn);
-//			return bookDao.getBooksWithBranchId(branchId);
-//		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-//			e.printStackTrace();
-//		} finally {
-//			if (conn != null) {
-//				conn.close();
-//			}
-//		}
-//		return null;
-//	}
-	
-	public void updateLibraryBranch(LibraryBranch branch) throws SQLException {
-		Connection conn = null;
-		try {
-			conn = util.getConnection();
-			LibraryBranchDAO branchDao = new LibraryBranchDAO(conn);
-			branchDao.updateLibraryBranch(branch);
-			conn.commit();
-		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
-			e.printStackTrace();
-			conn.rollback();
-		} finally {
-			if (conn != null) {
-				conn.close();
-			}
-		}
 	}
 	
 }
